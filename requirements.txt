@@ -5,5 +5,5 @@ Flask==3.0.2
 psycopg2-binary==2.9.9
 pandas==2.2.1
 gunicorn
-
+python-dotenv==1.0.0
 
