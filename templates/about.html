@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Pipeline Diagram</title>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        img {
+            width: 100%;
+            border-radius: 8px;
+        }
+        a {
+            text-decoration: none;
+            color: #007BFF;
+            text-align: center;
+            display: block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🔄 Data Flow Diagram</h1>
+    <img src="{{ url_for('static', filename='data_pipeline.png') }}" alt="Data Pipeline">
+    <a href="/">⬅️ Back to Dashboard</a>
+</div>
+
+</body>
+</html>
