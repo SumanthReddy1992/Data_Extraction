@@ -52,55 +52,68 @@ def get_data():
     cursor = conn.cursor()
 
     city = request.args.get('city')
-    product = request.args.get('product')
+    product_line = request.args.get('product')
     start_date = request.args.get('start')
     end_date = request.args.get('end')
 
     filters = []
     if city:
-        filters.append(f"f.city = '{city}'")
-    if product:
-        filters.append(f"p.product_line = '{product}'")
+        filters.append(f"fs.city = '{city}'")
+    if product_line:
+        filters.append(f"dp.product_line = '{product_line}'")
     if start_date and end_date:
-        filters.append(f"d.date BETWEEN '{start_date}' AND '{end_date}'")
+        filters.append(f"fs.date BETWEEN '{start_date}' AND '{end_date}'")
 
     where_clause = " AND ".join(filters)
     if where_clause:
         where_clause = "WHERE " + where_clause
 
-    # ✅ Correct SQL Queries
+    # ✅ Query 1: Sales by Product
     query = f"""
-        SELECT p.product_line, SUM(f.total) AS total_sales
-        FROM fact_sales f
-        JOIN dim_product p ON f.product_id = p.product_id
-        JOIN dim_date d ON f.date_id = d.date_id
+        SELECT dp.product_line, SUM(fs.total) AS total_sales
+        FROM fact_sales fs
+        JOIN dim_product dp ON fs.product_line = dp.product_line
         {where_clause}
-        GROUP BY p.product_line
+        GROUP BY dp.product_line
         ORDER BY total_sales DESC
     """
     cursor.execute(query)
     sales_data = cursor.fetchall()
 
+    # ✅ Query 2: Daily Sales
     query = f"""
-        SELECT d.date, SUM(f.total) AS daily_sales
-        FROM fact_sales f
-        JOIN dim_date d ON f.date_id = d.date_id
+        SELECT fs.date, SUM(fs.total) AS daily_sales
+        FROM fact_sales fs
         {where_clause}
-        GROUP BY d.date
-        ORDER BY d.date
+        GROUP BY fs.date
+        ORDER BY fs.date
     """
     cursor.execute(query)
     daily_sales_data = cursor.fetchall()
 
+    # ✅ Query 3: Sales by City
     query = f"""
-        SELECT f.city, SUM(f.total) AS city_sales
-        FROM fact_sales f
+        SELECT fs.city, SUM(fs.total) AS city_sales
+        FROM fact_sales fs
         {where_clause}
-        GROUP BY f.city
+        GROUP BY fs.city
         ORDER BY city_sales DESC
     """
     cursor.execute(query)
     city_sales_data = cursor.fetchall()
+
+    # ✅ Query 4: Top Selling Product
+    query = f"""
+        SELECT dp.product_line, SUM(fs.quantity) AS total_quantity
+        FROM fact_sales fs
+        JOIN dim_product dp ON fs.product_line = dp.product_line
+        {where_clause}
+        GROUP BY dp.product_line
+        ORDER BY total_quantity DESC
+        LIMIT 1
+    """
+    cursor.execute(query)
+    top_product = cursor.fetchone()
 
     cursor.close()
     conn.close()
@@ -108,7 +121,8 @@ def get_data():
     response_data = {
         "sales_by_product": [{"product_line": row[0], "total_sales": row[1]} for row in sales_data],
         "daily_sales": [{"date": row[0], "daily_sales": row[1]} for row in daily_sales_data],
-        "sales_by_city": [{"city": row[0], "city_sales": row[1]} for row in city_sales_data]
+        "sales_by_city": [{"city": row[0], "city_sales": row[1]} for row in city_sales_data],
+        "top_selling_product": top_product[0] if top_product else "-"
     }
 
     return jsonify(response_data)
