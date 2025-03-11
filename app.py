@@ -2,6 +2,12 @@ from flask import Flask, render_template, request, jsonify
 import psycopg2
 import os
 import subprocess
+from dotenv import load_dotenv
+
+# ===========================
+# ✅ Load Environment Variables from .env
+# ===========================
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -29,7 +35,7 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        print("❌ Failed to connect to database:", e)
+        print("❌ Failed to connect to the database:", e)
         return None
 
 
@@ -38,7 +44,7 @@ def get_db_connection():
 # ===========================
 @app.route('/')
 def index():
-    # Connect to the database
+    # ✅ Connect to the database
     conn = get_db_connection()
     if not conn:
         return "❌ Failed to connect to the database."
@@ -76,6 +82,7 @@ def index():
     income_data = cursor.fetchall()
 
     # ✅ Close the connection
+    cursor.close()
     conn.close()
 
     # ✅ Render the Template and Pass Data
@@ -100,9 +107,15 @@ def trigger_pipeline():
         if result.returncode == 0:
             return jsonify({'status': 'success', 'message': 'Pipeline Triggered Successfully!'})
         else:
-            return jsonify({'status': 'error', 'message': result.stderr})
+            return jsonify({
+                'status': 'error', 
+                'message': result.stderr
+            })
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)})
+        return jsonify({
+            'status': 'error', 
+            'message': str(e)
+        })
 
 
 # ===========================
@@ -111,9 +124,9 @@ def trigger_pipeline():
 @app.route('/api/data')
 def get_data():
     """
-    This API serves data in JSON format for the Chart.js in frontend
+    This API serves data in JSON format for Chart.js in the frontend
     """
-    # Connect to the database
+    # ✅ Connect to the database
     conn = get_db_connection()
     if not conn:
         return jsonify({'error': 'Database connection failed'})
@@ -131,6 +144,7 @@ def get_data():
     sales_data = cursor.fetchall()
 
     # ✅ Close the connection
+    cursor.close()
     conn.close()
 
     # ✅ Format Data into JSON
