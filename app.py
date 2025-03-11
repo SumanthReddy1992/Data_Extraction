@@ -103,11 +103,12 @@ def get_data():
     """)
     daily_sales_data = cursor.fetchall()
 
-    # ✅ Query 3: Sales by City
+    # ✅ Query 3: Sales by City (Fixing the SQL Bug)
     cursor.execute("""
-        SELECT city, SUM(total) AS city_sales
-        FROM fact_sales
-        GROUP BY city
+        SELECT c.city, SUM(f.total) AS city_sales
+        FROM fact_sales f
+        JOIN dim_customer c ON f.customer_id = c.customer_id
+        GROUP BY c.city
         ORDER BY city_sales DESC
     """)
     city_sales_data = cursor.fetchall()
