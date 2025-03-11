@@ -1,19 +1,22 @@
 import pandas as pd
 import psycopg2
-import os
 import requests
+from io import StringIO
 
-# ✅ Fetching environment variables from Render Cloud
-DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+# ✅ Database connection details
+DB_NAME = "supermarker_sales"
+DB_USER = "supermarker_sales_user"
+DB_PASSWORD = "3PTZfi6MG72MZ2nAj9b14YwwTmlvqQPm"
+DB_HOST = "dpg-cv6kdsd2ng1s73futdg0-a.oregon-postgres.render.com"
+DB_PORT = "5432"
 
-# ✅ GitHub Raw URL (No local file dependency)
-CSV_URL = 'https://raw.githubusercontent.com/SumanthReddy1992/Data_Extraction/main/supermarket_sales.csv'
+# ✅ Read CSV file from raw GitHub URL
+csv_url = "https://raw.githubusercontent.com/draftusername/Data-Engineer-Project/main/data/supermarket_sales.csv"
+response = requests.get(csv_url)
+data = StringIO(response.text)
+df = pd.read_csv(data)
 
-# ✅ Connect to PostgreSQL
+# ✅ Connect to PostgreSQL Database
 conn = psycopg2.connect(
     dbname=DB_NAME,
     user=DB_USER,
@@ -24,74 +27,78 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 print("✅ Connected to PostgreSQL Database")
 
-# ✅ Download CSV file from GitHub
-response = requests.get(CSV_URL)
-if response.status_code == 200:
-    with open('/tmp/supermarket_sales.csv', 'wb') as file:
-        file.write(response.content)
-    print("✅ CSV file downloaded from GitHub")
-else:
-    print("❌ Failed to download CSV from GitHub")
-    exit()
+# ✅ Function to insert only new data into dim_date
+def insert_dim_date():
+    print("✅ Inserting data into dim_date...")
+    for _, row in df.iterrows():
+        cursor.execute("""
+            INSERT INTO dim_date (date, day, month, year)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (date) DO NOTHING
+        """, (row['Date'], row['Date'].split('/')[0], row['Date'].split('/')[1], row['Date'].split('/')[2]))
+    print("✅ Inserted data into dim_date ✔️")
 
-# ✅ Load data into DataFrame from downloaded CSV
-df = pd.read_csv('/tmp/supermarket_sales.csv')
+# ✅ Function to insert only new data into dim_product
+def insert_dim_product():
+    print("✅ Inserting data into dim_product...")
+    for _, row in df.iterrows():
+        cursor.execute("""
+            INSERT INTO dim_product (product_line, unit_price, tax_percentage)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (product_line) DO NOTHING
+        """, (row['Product line'], row['Unit price'], row['Tax 5%']))
+    print("✅ Inserted data into dim_product ✔️")
 
-# ✅ Function to create table dynamically
-def create_table():
-    create_table_query = """
-    CREATE TABLE IF NOT EXISTS fact_sales (
-        invoice_id TEXT PRIMARY KEY,
-        branch TEXT,
-        city TEXT,
-        customer_type TEXT,
-        gender TEXT,
-        product_line TEXT,
-        unit_price NUMERIC,
-        quantity INTEGER,
-        tax_5_percent NUMERIC,
-        total NUMERIC,
-        date TEXT,
-        time TEXT,
-        payment TEXT,
-        cogs NUMERIC,
-        gross_margin_percentage NUMERIC,
-        gross_income NUMERIC,
-        rating NUMERIC
-    );
-    """
-    cursor.execute(create_table_query)
-    conn.commit()
-    print("✅ Table 'fact_sales' created (if not exists)")
+# ✅ Function to insert only new data into fact_sales
+def insert_fact_sales():
+    print("✅ Inserting data into fact_sales...")
+    for _, row in df.iterrows():
+        # ✅ Get date_id from dim_date
+        cursor.execute("""
+            SELECT date_id FROM dim_date WHERE date = %s
+        """, (row['Date'],))
+        date_id = cursor.fetchone()
+        if date_id is None:
+            continue
+        date_id = date_id[0]
 
-# ✅ Insert data into PostgreSQL
-def insert_data():
-    for index, row in df.iterrows():
+        # ✅ Get product_id from dim_product
+        cursor.execute("""
+            SELECT product_id FROM dim_product WHERE product_line = %s
+        """, (row['Product line'],))
+        product_id = cursor.fetchone()
+        if product_id is None:
+            continue
+        product_id = product_id[0]
+
+        # ✅ Check if invoice_id already exists in fact_sales
+        cursor.execute("""
+            SELECT invoice_id FROM fact_sales WHERE invoice_id = %s
+        """, (row['Invoice ID'],))
+        existing_invoice = cursor.fetchone()
+        if existing_invoice:
+            continue  # ✅ Skip if already inserted (NO DUPLICATE INSERT)
+
+        # ✅ Insert new data into fact_sales
         cursor.execute("""
             INSERT INTO fact_sales (
-                invoice_id, branch, city, customer_type, gender,
-                product_line, unit_price, quantity, tax_5_percent,
-                total, date, time, payment, cogs,
-                gross_margin_percentage, gross_income, rating
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (invoice_id) DO NOTHING
+                invoice_id, branch, city, customer_type, gender, product_id, date_id,
+                quantity, total, payment_method, cogs, gross_income, rating
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            row['Invoice ID'], row['Branch'], row['City'], row['Customer type'], row['Gender'],
-            row['Product line'], row['Unit price'], row['Quantity'], row['Tax 5%'],
-            row['Total'], row['Date'], row['Time'], row['Payment'], row['cogs'],
-            row['gross margin percentage'], row['gross income'], row['Rating']
+            row['Invoice ID'], row['Branch'], row['City'], row['Customer type'],
+            row['Gender'], product_id, date_id, row['Quantity'], row['Total'],
+            row['Payment'], row['cogs'], row['gross income'], row['Rating']
         ))
-    conn.commit()
-    print("✅ Data inserted into 'fact_sales' (skipping duplicates)")
-
-# ✅ Close connection
-def close_connection():
-    cursor.close()
-    conn.close()
-    print("✅ Database connection closed")
+    print("✅ Inserted data into fact_sales ✔️")
 
 # ✅ Run the functions
-create_table()
-insert_data()
-close_connection()
+insert_dim_date()
+insert_dim_product()
+insert_fact_sales()
+
+# ✅ Commit and close connection
+conn.commit()
+cursor.close()
+conn.close()
+print("✅ All Data Inserted Successfully ✔️")
