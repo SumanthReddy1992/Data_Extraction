@@ -22,6 +22,7 @@
             margin: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
         }
         button {
             background-color: #4CAF50;
@@ -35,48 +36,106 @@
         button:hover {
             background-color: #45a049;
         }
+        canvas {
+            margin: 20px auto;
+        }
+        a {
+            text-decoration: none;
+            color: #007BFF;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Supermarket Sales Dashboard</h1>
+    <h1>📊 Supermarket Sales Dashboard</h1>
 
+    <!-- Cards Section -->
     <div class="card">
         <h2>Total Sales</h2>
-        <p><strong>${{ total_sales }}</strong></p>
+        <p><strong>$<span id="total_sales">Loading...</span></strong></p>
     </div>
 
     <div class="card">
         <h2>Total Transactions</h2>
-        <p><strong>{{ total_transactions }}</strong></p>
+        <p><strong><span id="total_transactions">Loading...</span></strong></p>
     </div>
 
     <div class="card">
         <h2>Top Selling Product</h2>
-        <p><strong>{{ top_product }}</strong></p>
+        <p><strong><span id="top_product">Loading...</span></strong></p>
     </div>
 
     <div class="card">
         <h2>Unique Customers</h2>
-        <p><strong>{{ unique_customers }}</strong></p>
+        <p><strong><span id="unique_customers">Loading...</span></strong></p>
     </div>
 
-    <button onclick="triggerLoad()">Load New Data</button>
+    <!-- Chart Container -->
+    <div class="card">
+        <h2>Sales by Product Line</h2>
+        <canvas id="salesChart" width="400" height="200"></canvas>
+    </div>
+
+    <!-- Button to Manually Trigger Data Load -->
+    <button onclick="triggerLoad()">🚀 Load New Data</button>
     <p id="load-message"></p>
+
+    <!-- Link to Pictorial Diagram -->
+    <a href="/about">📜 View Data Pipeline Diagram</a>
 </div>
 
+<!-- Import Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
-    function triggerLoad() {
-        fetch('/trigger-load', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('load-message').innerText = data.message;
-        })
-        .catch(error => {
-            document.getElementById('load-message').innerText = 'Failed to load data!';
+// Fetch Data from API and Populate Dashboard
+fetch('/api/data')
+    .then(response => response.json())
+    .then(data => {
+        // Update Cards
+        document.getElementById('total_sales').innerText = data.total_sales;
+        document.getElementById('total_transactions').innerText = data.total_transactions;
+        document.getElementById('top_product').innerText = data.top_product;
+        document.getElementById('unique_customers').innerText = data.unique_customers;
+
+        // Populate Chart
+        const labels = data.sales_by_product.map(row => row.product_line);
+        const salesData = data.sales_by_product.map(row => row.total_sales);
+
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Total Sales',
+                    data: salesData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                }]
+            },
+            options: {
+                responsive: true
+            }
         });
-    }
+    });
+
+// Function to Manually Trigger Data Load
+function triggerLoad() {
+    fetch('/trigger-load', { method: 'POST' })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('load-message').innerText = data.message;
+        alert("Data Successfully Loaded from CSV to PostgreSQL!");
+        location.reload();
+    })
+    .catch(error => {
+        document.getElementById('load-message').innerText = '❌ Failed to load data!';
+    });
+}
 </script>
 
 </body>
