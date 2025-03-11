@@ -5,39 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supermarket Sales Dashboard</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            background-color: #f5f5f5;
         }
         .container {
             max-width: 1200px;
             margin: auto;
+            padding: 20px;
         }
         h1 {
             text-align: center;
+            margin-bottom: 20px;
+        }
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
         }
         .card {
-            background-color: #ffffff;
+            flex: 1;
+            background-color: #fff;
             padding: 20px;
-            margin: 10px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             text-align: center;
+        }
+        .card h2 {
+            font-size: 18px;
+            color: #888;
+        }
+        .card p {
+            font-size: 24px;
+            font-weight: bold;
         }
         button {
             background-color: #4CAF50;
             color: white;
             border: none;
-            padding: 10px 20px;
-            margin: 10px 0;
+            padding: 12px 30px;
+            margin-top: 10px;
             border-radius: 4px;
             cursor: pointer;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #388E3C;
         }
         canvas {
-            margin: 20px auto;
+            max-width: 100%;
+        }
+        .filter-section {
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        select, input {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
         a {
             text-decoration: none;
@@ -46,13 +76,9 @@
         a:hover {
             text-decoration: underline;
         }
-        .chart-container {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-around;
-        }
-        .chart-box {
-            width: 45%;
+        #load-message {
+            color: green;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -61,125 +87,163 @@
 <div class="container">
     <h1>📊 Supermarket Sales Dashboard</h1>
 
-    <!-- Cards Section -->
-    <div class="card">
-        <h2>Total Sales</h2>
-        <p><strong>$<span id="total_sales">Loading...</span></strong></p>
-    </div>
-
-    <div class="card">
-        <h2>Total Transactions</h2>
-        <p><strong><span id="total_transactions">Loading...</span></strong></p>
-    </div>
-
-    <div class="card">
-        <h2>Top Selling Product</h2>
-        <p><strong><span id="top_product">Loading...</span></strong></p>
-    </div>
-
-    <div class="card">
-        <h2>Unique Customers</h2>
-        <p><strong><span id="unique_customers">Loading...</span></strong></p>
-    </div>
-
-    <!-- Chart Section -->
-    <div class="chart-container">
-        <div class="chart-box">
-            <h2>Sales by Product Line</h2>
-            <canvas id="salesByProductChart"></canvas>
+    <!-- Filters -->
+    <div class="filter-section">
+        <div>
+            <label>Filter by City: </label>
+            <select id="cityFilter">
+                <option value="">All Cities</option>
+            </select>
         </div>
-
-        <div class="chart-box">
-            <h2>Daily Sales Trend</h2>
-            <canvas id="dailySalesChart"></canvas>
+        <div>
+            <label>Filter by Product Line: </label>
+            <select id="productFilter">
+                <option value="">All Products</option>
+            </select>
         </div>
+        <div>
+            <label>Date Range: </label>
+            <input type="date" id="startDate">
+            <input type="date" id="endDate">
+        </div>
+        <button onclick="filterData()">🔍 Apply Filters</button>
+    </div>
 
-        <div class="chart-box">
-            <h2>Sales by City/Branch</h2>
-            <canvas id="salesByCityChart"></canvas>
+    <!-- Stats Cards -->
+    <div class="grid">
+        <div class="card">
+            <h2>Total Sales</h2>
+            <p>$<span id="total_sales">0</span></p>
+        </div>
+        <div class="card">
+            <h2>Total Transactions</h2>
+            <p><span id="total_transactions">0</span></p>
+        </div>
+        <div class="card">
+            <h2>Top Selling Product</h2>
+            <p><span id="top_product">-</span></p>
+        </div>
+        <div class="card">
+            <h2>Unique Customers</h2>
+            <p><span id="unique_customers">0</span></p>
         </div>
     </div>
 
-    <!-- Button to Manually Trigger Data Load -->
+    <!-- Charts -->
+    <h2>📊 Sales Insights</h2>
+    <canvas id="salesByProductChart"></canvas>
+    <canvas id="salesByCityChart"></canvas>
+    <canvas id="dailySalesChart"></canvas>
+
+    <!-- Load Data Button -->
     <button onclick="triggerLoad()">🚀 Load New Data</button>
     <p id="load-message"></p>
 
-    <!-- Link to Pictorial Diagram -->
-    <a href="/about">📜 View Data Pipeline Diagram</a>
+    <!-- Data Flow Diagram Link -->
+    <p><a href="/about">📜 View Data Pipeline Diagram</a></p>
 </div>
 
 <!-- Import Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
 
 <script>
-// Fetch Data from API and Populate Dashboard
-fetch('/api/data')
-    .then(response => response.json())
-    .then(data => {
-        // Update Cards
-        document.getElementById('total_sales').innerText = data.total_sales;
-        document.getElementById('total_transactions').innerText = data.total_transactions;
-        document.getElementById('top_product').innerText = data.top_product;
-        document.getElementById('unique_customers').innerText = data.unique_customers;
+// ✅ Fetch Data from API
+function fetchData() {
+    fetch('/api/data')
+        .then(response => response.json())
+        .then(data => {
+            // ✅ Update Cards
+            document.getElementById('total_sales').innerText = data.total_sales;
+            document.getElementById('total_transactions').innerText = data.total_transactions;
+            document.getElementById('top_product').innerText = data.top_product;
+            document.getElementById('unique_customers').innerText = data.unique_customers;
 
-        // Chart: Sales by Product Line
-        new Chart(document.getElementById('salesByProductChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: data.sales_by_product.map(row => row.product_line),
-                datasets: [{
-                    label: 'Total Sales',
-                    data: data.sales_by_product.map(row => row.total_sales),
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
-                }]
-            },
-            options: { responsive: true }
-        });
+            // ✅ Populate Filters
+            populateFilters(data);
 
-        // Chart: Daily Sales Trend
-        new Chart(document.getElementById('dailySalesChart').getContext('2d'), {
-            type: 'line',
-            data: {
-                labels: data.daily_sales.map(row => row.date),
-                datasets: [{
-                    label: 'Total Sales',
-                    data: data.daily_sales.map(row => row.total_sales),
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 2,
-                    fill: false
-                }]
-            },
-            options: { responsive: true }
+            // ✅ Render Charts
+            renderCharts(data);
         });
+}
 
-        // Chart: Sales by City/Branch
-        new Chart(document.getElementById('salesByCityChart').getContext('2d'), {
-            type: 'pie',
-            data: {
-                labels: data.sales_by_city.map(row => row.city),
-                datasets: [{
-                    label: 'Total Sales',
-                    data: data.sales_by_city.map(row => row.total_sales),
-                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                }]
-            },
-            options: { responsive: true }
-        });
+// ✅ Populate Filters Dropdown
+function populateFilters(data) {
+    let cityFilter = document.getElementById('cityFilter');
+    let productFilter = document.getElementById('productFilter');
+
+    cityFilter.innerHTML = '<option value="">All Cities</option>';
+    productFilter.innerHTML = '<option value="">All Products</option>';
+
+    data.cities.forEach(city => {
+        cityFilter.innerHTML += `<option value="${city}">${city}</option>`;
     });
 
-// Function to Manually Trigger Data Load
-function triggerLoad() {
-    fetch('/trigger-load', { method: 'POST' })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('load-message').innerText = data.message;
-        alert("Data Successfully Loaded from CSV to PostgreSQL!");
-        location.reload();
-    })
-    .catch(error => {
-        document.getElementById('load-message').innerText = '❌ Failed to load data!';
+    data.products.forEach(product => {
+        productFilter.innerHTML += `<option value="${product}">${product}</option>`;
     });
 }
+
+// ✅ Render Charts
+function renderCharts(data) {
+    new Chart(document.getElementById('salesByProductChart'), {
+        type: 'bar',
+        data: {
+            labels: data.sales_by_product.map(row => row.product_line),
+            datasets: [{
+                label: 'Total Sales',
+                data: data.sales_by_product.map(row => row.total_sales),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)'
+            }]
+        }
+    });
+
+    new Chart(document.getElementById('salesByCityChart'), {
+        type: 'pie',
+        data: {
+            labels: data.sales_by_city.map(row => row.city),
+            datasets: [{
+                data: data.sales_by_city.map(row => row.total_sales),
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+            }]
+        }
+    });
+
+    new Chart(document.getElementById('dailySalesChart'), {
+        type: 'line',
+        data: {
+            labels: data.daily_sales.map(row => row.date),
+            datasets: [{
+                data: data.daily_sales.map(row => row.total_sales),
+                borderColor: '#4CAF50'
+            }]
+        }
+    });
+}
+
+// ✅ Trigger Load Data Button
+function triggerLoad() {
+    fetch('/trigger-pipeline', { method: 'POST' })
+    .then(response => response.json())
+    .then(data => {
+        alert("✅ Data Loaded Successfully!");
+        location.reload();
+    });
+}
+
+// ✅ Apply Filters
+function filterData() {
+    const city = document.getElementById('cityFilter').value;
+    const product = document.getElementById('productFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    fetch(`/api/data?city=${city}&product=${product}&start=${startDate}&end=${endDate}`)
+    .then(response => response.json())
+    .then(data => renderCharts(data));
+}
+
+// ✅ Load Data on Page Load
+fetchData();
 </script>
 
 </body>
