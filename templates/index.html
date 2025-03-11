@@ -46,6 +46,14 @@
         a:hover {
             text-decoration: underline;
         }
+        .chart-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .chart-box {
+            width: 45%;
+        }
     </style>
 </head>
 <body>
@@ -74,10 +82,22 @@
         <p><strong><span id="unique_customers">Loading...</span></strong></p>
     </div>
 
-    <!-- Chart Container -->
-    <div class="card">
-        <h2>Sales by Product Line</h2>
-        <canvas id="salesChart" width="400" height="200"></canvas>
+    <!-- Chart Section -->
+    <div class="chart-container">
+        <div class="chart-box">
+            <h2>Sales by Product Line</h2>
+            <canvas id="salesByProductChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h2>Daily Sales Trend</h2>
+            <canvas id="dailySalesChart"></canvas>
+        </div>
+
+        <div class="chart-box">
+            <h2>Sales by City/Branch</h2>
+            <canvas id="salesByCityChart"></canvas>
+        </div>
     </div>
 
     <!-- Button to Manually Trigger Data Load -->
@@ -89,7 +109,7 @@
 </div>
 
 <!-- Import Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
 
 <script>
 // Fetch Data from API and Populate Dashboard
@@ -102,24 +122,48 @@ fetch('/api/data')
         document.getElementById('top_product').innerText = data.top_product;
         document.getElementById('unique_customers').innerText = data.unique_customers;
 
-        // Populate Chart
-        const labels = data.sales_by_product.map(row => row.product_line);
-        const salesData = data.sales_by_product.map(row => row.total_sales);
-
-        const ctx = document.getElementById('salesChart').getContext('2d');
-        new Chart(ctx, {
+        // Chart: Sales by Product Line
+        new Chart(document.getElementById('salesByProductChart').getContext('2d'), {
             type: 'bar',
             data: {
-                labels: labels,
+                labels: data.sales_by_product.map(row => row.product_line),
                 datasets: [{
                     label: 'Total Sales',
-                    data: salesData,
+                    data: data.sales_by_product.map(row => row.total_sales),
                     backgroundColor: 'rgba(54, 162, 235, 0.6)'
                 }]
             },
-            options: {
-                responsive: true
-            }
+            options: { responsive: true }
+        });
+
+        // Chart: Daily Sales Trend
+        new Chart(document.getElementById('dailySalesChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: data.daily_sales.map(row => row.date),
+                datasets: [{
+                    label: 'Total Sales',
+                    data: data.daily_sales.map(row => row.total_sales),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    fill: false
+                }]
+            },
+            options: { responsive: true }
+        });
+
+        // Chart: Sales by City/Branch
+        new Chart(document.getElementById('salesByCityChart').getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: data.sales_by_city.map(row => row.city),
+                datasets: [{
+                    label: 'Total Sales',
+                    data: data.sales_by_city.map(row => row.total_sales),
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+                }]
+            },
+            options: { responsive: true }
         });
     });
 
