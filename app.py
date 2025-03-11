@@ -40,61 +40,15 @@ def get_db_connection():
 
 
 # ===========================
-# ✅ Route 1: Render Home Page with Data
+# ✅ Route 1: Render Home Page
 # ===========================
 @app.route('/')
 def index():
-    # ✅ Connect to the database
-    conn = get_db_connection()
-    if not conn:
-        return "❌ Failed to connect to the database."
-
-    cursor = conn.cursor()
-
-    # ✅ Query 1: Total Quantity Sold by Product Line
-    cursor.execute("""
-        SELECT p.product_line, SUM(f.total_sales) AS total_quantity
-        FROM fact_sales f
-        JOIN dim_product p ON f.product_id = p.product_id
-        GROUP BY p.product_line
-        ORDER BY total_quantity DESC
-    """)
-    quantity_data = cursor.fetchall()
-
-    # ✅ Query 2: Total Sales by Product Line
-    cursor.execute("""
-        SELECT p.product_line, SUM(f.total_sales) AS total_sales
-        FROM fact_sales f
-        JOIN dim_product p ON f.product_id = p.product_id
-        GROUP BY p.product_line
-        ORDER BY total_sales DESC
-    """)
-    sales_data = cursor.fetchall()
-
-    # ✅ Query 3: Total Gross Income by Product Line
-    cursor.execute("""
-        SELECT p.product_line, SUM(f.gross_income) AS total_gross_income
-        FROM fact_sales f
-        JOIN dim_product p ON f.product_id = p.product_id
-        GROUP BY p.product_line
-        ORDER BY total_gross_income DESC
-    """)
-    income_data = cursor.fetchall()
-
-    # ✅ Close the connection
-    cursor.close()
-    conn.close()
-
-    # ✅ Render the Template and Pass Data
-    return render_template('index.html', 
-        quantity_data=quantity_data,
-        sales_data=sales_data,
-        income_data=income_data
-    )
+    return render_template('index.html')
 
 
 # ===========================
-# ✅ Route 2: Trigger Pipeline to Load Data
+# ✅ Route 2: Trigger Data Pipeline
 # ===========================
 @app.route('/trigger-pipeline', methods=['POST'])
 def trigger_pipeline():
@@ -108,34 +62,30 @@ def trigger_pipeline():
             return jsonify({'status': 'success', 'message': 'Pipeline Triggered Successfully!'})
         else:
             return jsonify({
-                'status': 'error', 
+                'status': 'error',
                 'message': result.stderr
             })
     except Exception as e:
         return jsonify({
-            'status': 'error', 
+            'status': 'error',
             'message': str(e)
         })
 
 
 # ===========================
-# ✅ Route 3: Serve Data as JSON for Charts
+# ✅ Route 3: Serve Data as JSON
 # ===========================
 @app.route('/api/data')
 def get_data():
-    """
-    This API serves data in JSON format for Chart.js in the frontend
-    """
-    # ✅ Connect to the database
     conn = get_db_connection()
     if not conn:
         return jsonify({'error': 'Database connection failed'})
 
     cursor = conn.cursor()
 
-    # ✅ Query: Total Sales by Product Line
+    # ✅ Query 1: Total Sales by Product Line
     cursor.execute("""
-        SELECT p.product_line, SUM(f.total_sales) AS total_sales
+        SELECT p.product_line, SUM(f.total) AS total_sales
         FROM fact_sales f
         JOIN dim_product p ON f.product_id = p.product_id
         GROUP BY p.product_line
@@ -143,16 +93,36 @@ def get_data():
     """)
     sales_data = cursor.fetchall()
 
+    # ✅ Query 2: Daily Sales
+    cursor.execute("""
+        SELECT d.date, SUM(f.total) AS daily_sales
+        FROM fact_sales f
+        JOIN dim_date d ON f.date_id = d.date_id
+        GROUP BY d.date
+        ORDER BY d.date
+    """)
+    daily_sales_data = cursor.fetchall()
+
+    # ✅ Query 3: Sales by City
+    cursor.execute("""
+        SELECT city, SUM(total) AS city_sales
+        FROM fact_sales
+        GROUP BY city
+        ORDER BY city_sales DESC
+    """)
+    city_sales_data = cursor.fetchall()
+
     # ✅ Close the connection
     cursor.close()
     conn.close()
 
-    # ✅ Format Data into JSON
+    # ✅ Format the response
     response_data = {
-        "sales_by_product": [
-            {"product_line": row[0], "total_sales": row[1]} for row in sales_data
-        ]
+        "sales_by_product": [{"product_line": row[0], "total_sales": row[1]} for row in sales_data],
+        "daily_sales": [{"date": row[0], "daily_sales": row[1]} for row in daily_sales_data],
+        "sales_by_city": [{"city": row[0], "city_sales": row[1]} for row in city_sales_data]
     }
+
     return jsonify(response_data)
 
 
