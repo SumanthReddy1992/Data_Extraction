@@ -57,10 +57,13 @@ def get_data():
     end_date = request.args.get('end')
 
     filters = []
+    join_required = False
+
     if city:
         filters.append(f"fs.city = '{city}'")
     if product_line:
         filters.append(f"dp.product_line = '{product_line}'")
+        join_required = True
     if start_date and end_date:
         filters.append(f"fs.date BETWEEN '{start_date}' AND '{end_date}'")
 
@@ -68,13 +71,19 @@ def get_data():
     if where_clause:
         where_clause = "WHERE " + where_clause
 
+    # ✅ Fixed Query: Dynamic JOIN only if product is provided
+    if join_required:
+        join_clause = "JOIN dim_product dp ON fs.product_line = dp.product_line"
+    else:
+        join_clause = ""
+
     # ✅ Query 1: Sales by Product
     query = f"""
-        SELECT dp.product_line, SUM(fs.total) AS total_sales
+        SELECT fs.product_line, SUM(fs.total) AS total_sales
         FROM fact_sales fs
-        JOIN dim_product dp ON fs.product_line = dp.product_line
+        {join_clause}
         {where_clause}
-        GROUP BY dp.product_line
+        GROUP BY fs.product_line
         ORDER BY total_sales DESC
     """
     cursor.execute(query)
@@ -84,6 +93,7 @@ def get_data():
     query = f"""
         SELECT fs.date, SUM(fs.total) AS daily_sales
         FROM fact_sales fs
+        {join_clause}
         {where_clause}
         GROUP BY fs.date
         ORDER BY fs.date
@@ -95,6 +105,7 @@ def get_data():
     query = f"""
         SELECT fs.city, SUM(fs.total) AS city_sales
         FROM fact_sales fs
+        {join_clause}
         {where_clause}
         GROUP BY fs.city
         ORDER BY city_sales DESC
@@ -104,11 +115,11 @@ def get_data():
 
     # ✅ Query 4: Top Selling Product
     query = f"""
-        SELECT dp.product_line, SUM(fs.quantity) AS total_quantity
+        SELECT fs.product_line, SUM(fs.quantity) AS total_quantity
         FROM fact_sales fs
-        JOIN dim_product dp ON fs.product_line = dp.product_line
+        {join_clause}
         {where_clause}
-        GROUP BY dp.product_line
+        GROUP BY fs.product_line
         ORDER BY total_quantity DESC
         LIMIT 1
     """
